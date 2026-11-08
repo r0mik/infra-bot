@@ -1,0 +1,6 @@
+The homelab:
+- main: node label node="main" (node-exporter nodename "server1"), 4 cores, 16 GiB RAM, 512 GB NVMe. k3s cluster "main": monitoring (Prometheus, Alertmanager, Grafana), reverse proxy, Git server, object storage, a couple of apps.
+- test: node="test", 6 cores, 16 GiB RAM, 256 GB NVMe. k3s cluster "test": apps under test.
+- Labels: every series has env (main / test / network) and node; Kubernetes series also have cluster (main / test). Test alerts are not sent to Telegram but are still in Alertmanager.
+- Jobs: node, kube-state-metrics, kubelet, kubelet-cadvisor, blackbox-http (web UIs), blackbox-dns (DNS), blackbox-icmp (router), prometheus, alertmanager.
+- Handy metrics: up, node_cpu_seconds_total, node_load1, node_memory_MemAvailable_bytes, node_memory_MemTotal_bytes, node_filesystem_avail_bytes / node_filesystem_size_bytes (fstype=~"ext4|xfs"), node_hwmon_temp_celsius, node_vmstat_oom_kill, kube_pod_status_phase, kube_pod_container_status_restarts_total, kube_deployment_status_replicas_available, container_cpu_usage_seconds_total, container_memory_working_set_bytes, kubelet_volume_stats_available_bytes, probe_success, probe_duration_seconds. Use find_metrics for anything else.
