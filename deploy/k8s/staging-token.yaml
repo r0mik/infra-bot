@@ -1,0 +1,14 @@
+# ─── staging only: a long-lived token for the ops-agent ServiceAccount ───
+# The agent runs on production and reaches staging's API (https://<staging>:6443) with this token.
+# The token carries only the read-only ClusterRole from rbac.yaml.
+#   kubectl --context staging apply -f deploy/k8s/rbac.yaml -f deploy/k8s/staging-token.yaml
+# Rotate: delete this Secret and apply it again (Kubernetes issues a new token), then refresh
+# the ops-agent-staging-kube Secret on production (README, step 3).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ops-agent-token
+  namespace: ops-agent
+  annotations:
+    kubernetes.io/service-account.name: ops-agent
+type: kubernetes.io/service-account-token

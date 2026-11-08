@@ -33,6 +33,15 @@ class Telegram:
     def typing(self, chat_id: int) -> None:
         self._call("sendChatAction", chat_id=chat_id, action="typing")
 
-    def send(self, chat_id: int, text: str) -> None:
-        for i in range(0, len(text), MAX_MESSAGE):
-            self._call("sendMessage", chat_id=chat_id, text=text[i:i + MAX_MESSAGE])
+    def send(self, chat_id: int, text: str) -> int:
+        """Send (split into parts if long); returns the id of the last message."""
+        message_id = 0
+        for i in range(0, max(len(text), 1), MAX_MESSAGE):
+            message_id = self._call("sendMessage", chat_id=chat_id, text=text[i:i + MAX_MESSAGE] or "…")["message_id"]
+        return message_id
+
+    def edit(self, chat_id: int, message_id: int, text: str) -> None:
+        self._call("editMessageText", chat_id=chat_id, message_id=message_id, text=text[:MAX_MESSAGE])
+
+    def delete(self, chat_id: int, message_id: int) -> None:
+        self._call("deleteMessage", chat_id=chat_id, message_id=message_id)

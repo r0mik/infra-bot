@@ -1,11 +1,13 @@
 [project]
-name = "cluster-bot"
+name = "ops-agent"
 version = "0.1.0"
-description = "Telegram bot that answers questions about a homelab from Prometheus and Alertmanager"
+description = "Read-only LangGraph on-call agent for the homelab (Kubernetes, nodes, monitoring) in Telegram"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28.1",
-    "openai>=2.54.0",
+    "langchain-openai>=1.7.4",
+    "langgraph>=1.2.20",
+    "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]

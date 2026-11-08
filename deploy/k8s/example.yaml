@@ -1,0 +1,84 @@
+# ─── ops-agent: example Deployment. Copy, fill in the <placeholders>, then (after rbac.yaml and the secrets):
+#   kubectl apply -f deploy/k8s/rbac.yaml -f my-ops-agent.yaml
+#
+# One Telegram poller per bot token, hence 1 replica + Recreate. If this pod uses the same token as
+# another bot process (e.g. Alertmanager's sender is fine, a second poller is not), stop it first, or both get 409 Conflict.
+# Secrets (never in git), all in namespace ops-agent:
+#   ops-agent-telegram       telegram-bot-token
+#   ops-agent-llm            api-key
+#   ops-agent-staging-kube   token, ca.crt          (staging's read-only ServiceAccount)
+#   ops-agent-ssh            id_ed25519, known_hosts (key of the node user `ops-agent`, forced command)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-agent
+  namespace: ops-agent
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: ops-agent}
+  template:
+    metadata:
+      labels: {app: ops-agent}
+    spec:
+      serviceAccountName: ops-agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001                      # lets it read the 0440 Secret files
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: ops-agent
+          image: <registry>/ops-agent:<tag>
+          env:
+            - {name: ALLOWED_CHAT_IDS, value: "<your Telegram chat id>"}
+            - {name: LLM_MODEL, value: gpt-6-luna}
+            # gpt-6-luna rejects tools + reasoning in /v1/chat/completions
+            - {name: LLM_REASONING_EFFORT, value: none}
+            - {name: TZ, value: UTC}
+            - {name: PROMETHEUS_URL, value: "http://prometheus.monitoring:9090"}
+            - {name: ALERTMANAGER_URL, value: "http://alertmanager.monitoring:9093"}
+            - {name: LOKI_URL, value: "http://loki.monitoring:3100"}
+            - {name: K8S_CLUSTERS, value: "production=in-cluster,staging=https://<staging-api-host>:6443"}
+            - {name: KUBE_SECRETS_DIR, value: /secrets/kube}
+            - {name: NODES, value: "production=ops-agent@<node1-ip>,staging=ops-agent@<node2-ip>"}
+            - {name: SSH_KEY_FILE, value: /secrets/ssh/id_ed25519}
+            - {name: SSH_KNOWN_HOSTS, value: /secrets/ssh/known_hosts}
+            - {name: HTTP_ALLOWED_SUFFIXES, value: ".home.arpa"}
+            - {name: HTTP_CA_FILE, value: /secrets/http-ca/ca.crt}
+            - {name: MAX_STEPS, value: "12"}
+            - {name: TELEGRAM_TOKEN_FILE, value: /secrets/telegram/telegram-bot-token}
+            - {name: LLM_API_KEY_FILE, value: /secrets/llm/api-key}
+            - {name: CONTEXT_FILE, value: /config/context.md}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: telegram, mountPath: /secrets/telegram, readOnly: true}
+            - {name: llm, mountPath: /secrets/llm, readOnly: true}
+            - {name: staging-kube, mountPath: /secrets/kube/staging, readOnly: true}
+            - {name: ssh, mountPath: /secrets/ssh, readOnly: true}
+            - {name: http-ca, mountPath: /secrets/http-ca, readOnly: true}
+            - {name: context, mountPath: /config, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+          resources:
+            requests: {cpu: 20m, memory: 128Mi}
+            limits: {memory: 384Mi}
+      volumes:
+        - name: telegram
+          secret: {secretName: ops-agent-telegram, defaultMode: 0440}
+        - name: llm
+          secret: {secretName: ops-agent-llm, defaultMode: 0440}
+        - name: staging-kube
+          secret: {secretName: ops-agent-staging-kube, defaultMode: 0440, optional: true}
+        - name: ssh
+          secret: {secretName: ops-agent-ssh, defaultMode: 0440, optional: true}
+        - name: http-ca
+          configMap: {name: http-ca, optional: true}   # root CA of your internal TLS, key ca.crt
+        - name: context              # kubectl -n ops-agent create configmap ops-agent-context --from-file=context.md
+          configMap: {name: ops-agent-context, optional: true}
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}

@@ -1,5 +1,9 @@
 .venv/
 __pycache__/
 .pytest_cache/
-*.pyc
+secrets/
+# private: this homelab's description, deploy manifest and notes
 context.md
+README.homelab.md
+deploy/k8s/production.yaml
+deploy/switch-from-cluster-bot.sh
